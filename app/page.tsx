@@ -1,52 +1,118 @@
-"use client";
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { Book, Mail, Lightbulb, BookOpen, Briefcase } from "lucide-react"
 
-import { useState, useEffect } from "react";
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "@/amplify/data/resource";
-import "./../app/app.css";
-import { Amplify } from "aws-amplify";
-import outputs from "@/amplify_outputs.json";
-import "@aws-amplify/ui-react/styles.css";
-
-Amplify.configure(outputs);
-
-const client = generateClient<Schema>();
-
-export default function App() {
-  const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
-
-  function listTodos() {
-    client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
-    });
-  }
-
-  useEffect(() => {
-    listTodos();
-  }, []);
-
-  function createTodo() {
-    client.models.Todo.create({
-      content: window.prompt("Todo content"),
-    });
-  }
-
+export default function Home() {
   return (
-    <main>
-      <h1>My todos</h1>
-      <button onClick={createTodo}>+ new</button>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>{todo.content}</li>
-        ))}
-      </ul>
-      <div>
-        🥳 App successfully hosted. Try creating a new todo.
-        <br />
-        <a href="https://docs.amplify.aws/nextjs/start/quickstart/nextjs-app-router-client-components/">
-          Review next steps of this tutorial.
-        </a>
+    <div className="flex flex-col gap-8">
+      <section className="py-12 md:py-16 lg:py-20">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
+              Welcome to{" "}
+              <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                GradMate
+              </span>
+            </h1>
+            <p className="max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
+              Your all-in-one platform for academic success and career preparation
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Research Email Generator
+            </CardTitle>
+            <CardDescription>Create professional emails to reach out to research labs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Select your target school and lab to generate a personalized email template for research opportunities.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/research-emails">Get Started</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" />
+              Essay Idea Generator
+            </CardTitle>
+            <CardDescription>Get personalized essay topic suggestions based on your profile</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Input your essay prompt and get tailored brainstorming ideas based on your experiences and background.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/essay-ideas">Generate Ideas</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Book className="h-5 w-5" />
+              College Essay Grader
+            </CardTitle>
+            <CardDescription>Get AI-powered feedback on your college essays</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Upload your essay and receive detailed feedback on structure, clarity, style, and emotional impact.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/essay-review">Analyze Essay</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              SAT/ACT Practice Analysis
+            </CardTitle>
+            <CardDescription>Upload your practice tests and get personalized improvement strategies</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Submit your answer key or full test to receive detailed analysis and targeted study recommendations.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/sat-act">Analyze Tests</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5" />
+              Internship Application Helper
+            </CardTitle>
+            <CardDescription>Generate personalized internship emails and track applications</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Create professional outreach emails and manage your internship application process efficiently.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/internships">Get Started</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
-    </main>
-  );
+    </div>
+  )
 }
