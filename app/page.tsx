@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { Book, Mail, Lightbulb, BookOpen, Briefcase } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
   const [apiResponse, setApiResponse] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const testApi = async () => {
     setIsLoading(true);
@@ -61,14 +63,20 @@ export default function Home() {
               Your all-in-one platform for academic success and career preparation
             </p>
             <div className="flex flex-col items-center gap-4">
-              <Button 
-                onClick={testApi} 
-                className="mt-4"
+              <Button
                 variant="outline"
-                disabled={isLoading}
+                className="w-full"
+                onClick={() => router.push("/profile")}
               >
-                {isLoading ? 'Testing API...' : 'Test API Connection'}
+                View Profile
               </Button>
+              {/* <Button
+                variant="outline"
+                className="w-full"
+                onClick={testApi}
+              >
+                Test API Connection
+              </Button> */}
               
               {apiResponse && (
                 <Card className="w-full max-w-md">
