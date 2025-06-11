@@ -63,13 +63,6 @@ export default function Home() {
               Your all-in-one platform for academic success and career preparation
             </p>
             <div className="flex flex-col items-center gap-4">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => router.push("/profile")}
-              >
-                View Profile
-              </Button>
               {/* <Button
                 variant="outline"
                 className="w-full"
