@@ -1,9 +1,51 @@
+"use client"
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { Book, Mail, Lightbulb, BookOpen, Briefcase } from "lucide-react"
 
 export default function Home() {
+  const [apiResponse, setApiResponse] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const testApi = async () => {
+    setIsLoading(true);
+    setApiResponse(null);
+    console.log('Starting API call...');
+    try {
+      const response = await fetch('https://53dhwuhsl8.execute-api.us-east-2.amazonaws.com/default/gradmate-ai-service', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'hbTJHKmAzW31KclNxEbAOaIMopgsitk73CM0iZYY',
+          'Accept': 'application/json',
+          'Origin': 'http://localhost:3000'
+        },
+        mode: 'cors',
+        credentials: 'omit',
+        body: JSON.stringify({
+          message: "Test message"
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('API Response:', data);
+      setApiResponse(data.message);
+    } catch (error) {
+      console.error('API Error:', error);
+      setApiResponse('Error: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8">
       <section className="py-12 md:py-16 lg:py-20">
@@ -18,6 +60,28 @@ export default function Home() {
             <p className="max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
               Your all-in-one platform for academic success and career preparation
             </p>
+            <div className="flex flex-col items-center gap-4">
+              <Button 
+                onClick={testApi} 
+                className="mt-4"
+                variant="outline"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Testing API...' : 'Test API Connection'}
+              </Button>
+              
+              {apiResponse && (
+                <Card className="w-full max-w-md">
+                  <CardHeader>
+                    <CardTitle>API Response</CardTitle>
+                    <CardDescription>Message from the server</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg">{apiResponse}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
       </section>

@@ -8,8 +8,8 @@ import { Navbar } from "@/components/navbar"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "GradMate",
-  description: "Platform to help students apply for research and improve college essays",
+  title: "GradMate - Your Academic Success Platform",
+  description: "Your all-in-one platform for academic success and career preparation",
 }
 
 export default function RootLayout({
