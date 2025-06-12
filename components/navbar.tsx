@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { User } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -13,13 +13,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createBrowserClient } from "@supabase/ssr"
 import { useEffect, useState } from "react"
 
 export function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -27,11 +31,24 @@ export function Navbar() {
       setIsAuthenticated(!!session)
     }
     checkAuth()
-  }, [supabase.auth])
+
+    // Subscribe to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session)
+      if (!session && pathname.startsWith('/profile')) {
+        router.push('/signin')
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase.auth, pathname, router])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     setIsAuthenticated(false)
+    router.push('/')
   }
 
   return (
