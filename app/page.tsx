@@ -34,7 +34,7 @@ export default function Home() {
               </span>
             </h1>
             <p className="max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
-              Your all-in-one platform for academic success and career preparation
+              Your one stop shop for automated academic success and career preparation
             </p>
             {!isLoggedIn && (
               <div className="flex gap-4 mt-4">

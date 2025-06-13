@@ -43,3 +43,11 @@ $$ language plpgsql security definer;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user(); 
+
+  -- Enable RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to insert their own profile
+CREATE POLICY "Allow self insert" ON profiles
+  FOR INSERT
+  WITH CHECK (auth.uid() = id);

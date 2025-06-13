@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Upload, X, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { supabase } from "@/lib/supabase"
 
 interface ProfileData {
   name: string
@@ -37,45 +38,64 @@ export default function Profile() {
   })
 
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
-  // Check if user is logged in and load profile data
+  // Check auth and fetch profile from Supabase
   useEffect(() => {
-    const userData = localStorage.getItem("gradmate-user")
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData)
-        setIsLoggedIn(parsedUser.isLoggedIn)
+    const init = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-        // Pre-fill name from user data if available
-        if (parsedUser.name) {
+      if (!user) {
+        router.replace("/sign-in")
+        return
+      }
+
+      setUserId(user.id)
+      setIsLoggedIn(true)
+
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("name, school, major, minor, gpa")
+          .eq("id", user.id)
+          .single()
+
+        if (error) {
+          console.error("Error fetching profile:", error)
+        } else if (data) {
           setProfileData((prev) => ({
             ...prev,
-            name: parsedUser.name,
+            name: data.name || "",
+            school: data.school || "",
+            major: data.major || "",
+            minor: data.minor || "",
+            gpa: data.gpa || "",
           }))
+
+          // Update localStorage user name for navbar display
+          const userData = localStorage.getItem("gradmate-user")
+          if (userData) {
+            try {
+              const parsed = JSON.parse(userData)
+              parsed.name = data.name || parsed.name
+              localStorage.setItem("gradmate-user", JSON.stringify(parsed))
+            } catch (err) {
+              console.error("Error updating local user cache:", err)
+            }
+          }
         }
-      } catch (error) {
-        console.error("Error parsing user data:", error)
+      } catch (err) {
+        console.error("Error loading profile:", err)
+      } finally {
+        setLoading(false)
       }
-    } else {
-      // Redirect to sign in if not logged in
-      router.push("/sign-in")
     }
 
-    // Load existing profile data if available
-    const savedProfile = localStorage.getItem("gradmate-profile")
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile)
-        setProfileData((prev) => ({
-          ...prev,
-          ...parsed,
-          resume: null, // Can't store File objects in localStorage
-        }))
-      } catch (error) {
-        console.error("Error parsing profile data:", error)
-      }
-    }
+    init()
   }, [router])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -115,36 +135,48 @@ export default function Profile() {
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!userId) return
     setSaving(true)
 
-    // Update user name in user data
-    const userData = localStorage.getItem("gradmate-user")
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData)
-        parsedUser.name = profileData.name
-        localStorage.setItem("gradmate-user", JSON.stringify(parsedUser))
-      } catch (error) {
-        console.error("Error updating user data:", error)
+    try {
+      const { error } = await supabase.from("profiles").upsert({
+        id: userId,
+        name: profileData.name,
+        school: profileData.school,
+        major: profileData.major,
+        minor: profileData.minor,
+        gpa: profileData.gpa,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (error) throw error
+
+      // Update local username cache for navbar
+      const userCache = localStorage.getItem("gradmate-user")
+      if (userCache) {
+        try {
+          const parsed = JSON.parse(userCache)
+          parsed.name = profileData.name
+          localStorage.setItem("gradmate-user", JSON.stringify(parsed))
+        } catch (_) {}
       }
-    }
 
-    // Save profile data to localStorage
-    const profileToSave = {
-      ...profileData,
-      resume: null, // Can't store File objects in localStorage
-    }
-    localStorage.setItem("gradmate-profile", JSON.stringify(profileToSave))
-
-    // Mock API call - in a real app, you would send the data to your backend
-    setTimeout(() => {
-      setSaving(false)
-
-      // Redirect to home page after saving
       router.push("/")
-    }, 1000)
+    } catch (err) {
+      console.error("Error saving profile:", err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    )
   }
 
   if (!isLoggedIn) {
