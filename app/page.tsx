@@ -64,10 +64,11 @@ export default function Home() {
               Select your target school and lab to generate a personalized email template for research opportunities.
             </p>
             <Button asChild className="w-full">
-              <Link href={isLoggedIn ? "/research-emails" : "/sign-in"}>
-                {isLoggedIn ? "Get Started" : "Sign In to Access"}
-              </Link>
+              <Link href="/research-emails">Get Started</Link>
             </Button>
+            {!isLoggedIn && (
+              <p className="mt-2 text-xs text-muted-foreground italic">Sign in for personalized results</p>
+            )}
           </CardContent>
         </Card>
 
@@ -84,10 +85,11 @@ export default function Home() {
               Input your essay prompt and get tailored brainstorming ideas based on your experiences and background.
             </p>
             <Button asChild className="w-full">
-              <Link href={isLoggedIn ? "/essay-ideas" : "/sign-in"}>
-                {isLoggedIn ? "Generate Ideas" : "Sign In to Access"}
-              </Link>
+              <Link href="/essay-ideas">Get Started</Link>
             </Button>
+            {!isLoggedIn && (
+              <p className="mt-2 text-xs text-muted-foreground italic">Sign in for personalized results</p>
+            )}
           </CardContent>
         </Card>
 
@@ -104,10 +106,11 @@ export default function Home() {
               Upload your essay and receive detailed feedback on structure, clarity, style, and emotional impact.
             </p>
             <Button asChild className="w-full">
-              <Link href={isLoggedIn ? "/essay-review" : "/sign-in"}>
-                {isLoggedIn ? "Analyze Essay" : "Sign In to Access"}
-              </Link>
+              <Link href="/essay-review">Get Started</Link>
             </Button>
+            {!isLoggedIn && (
+              <p className="mt-2 text-xs text-muted-foreground italic">Sign in for personalized results</p>
+            )}
           </CardContent>
         </Card>
 
@@ -124,10 +127,11 @@ export default function Home() {
               Submit your answer key or full test to receive detailed analysis and targeted study recommendations.
             </p>
             <Button asChild className="w-full">
-              <Link href={isLoggedIn ? "/sat-act" : "/sign-in"}>
-                {isLoggedIn ? "Analyze Tests" : "Sign In to Access"}
-              </Link>
+              <Link href="/sat-act">Get Started</Link>
             </Button>
+            {!isLoggedIn && (
+              <p className="mt-2 text-xs text-muted-foreground italic">Sign in for personalized results</p>
+            )}
           </CardContent>
         </Card>
 
@@ -144,10 +148,11 @@ export default function Home() {
               Create professional outreach emails and manage your internship application process efficiently.
             </p>
             <Button asChild className="w-full">
-              <Link href={isLoggedIn ? "/internships" : "/sign-in"}>
-                {isLoggedIn ? "Get Started" : "Sign In to Access"}
-              </Link>
+              <Link href="/internships">Get Started</Link>
             </Button>
+            {!isLoggedIn && (
+              <p className="mt-2 text-xs text-muted-foreground italic">Sign in for personalized results</p>
+            )}
           </CardContent>
         </Card>
       </div>
