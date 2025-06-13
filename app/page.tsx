@@ -52,7 +52,7 @@ export default function Home() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="h-full flex flex-col">
-          <CardHeader>
+          <CardHeader className="min-h-28">
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
               Research Email Generator
@@ -73,7 +73,7 @@ export default function Home() {
         </Card>
 
         <Card className="h-full flex flex-col">
-          <CardHeader>
+          <CardHeader className="min-h-28">
             <CardTitle className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5" />
               Essay Idea Generator
@@ -94,7 +94,7 @@ export default function Home() {
         </Card>
 
         <Card className="h-full flex flex-col">
-          <CardHeader>
+          <CardHeader className="min-h-28">
             <CardTitle className="flex items-center gap-2">
               <Book className="h-5 w-5" />
               College Essay Grader
@@ -115,7 +115,7 @@ export default function Home() {
         </Card>
 
         <Card className="h-full flex flex-col">
-          <CardHeader>
+          <CardHeader className="min-h-28">
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="h-5 w-5" />
               SAT/ACT Practice Analysis
@@ -136,7 +136,7 @@ export default function Home() {
         </Card>
 
         <Card className="h-full flex flex-col">
-          <CardHeader>
+          <CardHeader className="min-h-28">
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5" />
               Internship Application Helper
