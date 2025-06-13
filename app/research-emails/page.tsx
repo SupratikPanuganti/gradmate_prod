@@ -99,18 +99,30 @@ export default function ResearchEmails() {
 
     setGenerating(true)
     try {
-      // In a real app, this would be an actual API call
-      // const response = await fetch(`/api/email-draft?lab_id=${selectedLab}`)
-      // const data = await response.json()
+      const response = await fetch("/api/generate-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          labName: currentLab.name,
+          researchArea: currentLab.researchArea,
+          labDescription: currentLab.description,
+          userProfile: {
+            name: "Test User", // replace with real user data later
+            year: "Junior",
+            university: "Georgia Tech",
+            major: "Computer Science",
+          },
+        }),
+      })
 
-      // Mock email generation
-      setTimeout(() => {
-        const professor = currentLab.professors[0]
-        const mockEmail = `Subject: Undergraduate Research Opportunity Inquiry - ${currentLab.name}\n\nDear ${professor.name},\n\nI hope this email finds you well. My name is [Your Name], and I am a [Your Year] student at [Your University] majoring in [Your Major].\n\nI am writing to express my interest in research opportunities at the ${currentLab.name}. I was particularly drawn to your work in ${currentLab.researchArea}, especially [mention specific research or publication that interests you].\n\n${currentLab.description} This aligns perfectly with my academic interests and career goals in [relevant field].\n\nDuring my studies, I have completed coursework in [relevant courses] and have developed skills in [relevant skills]. I have also [mention any relevant projects, experience, or achievements].\n\nI would greatly appreciate the opportunity to discuss potential research positions in your lab, whether for course credit, as a volunteer, or as a paid position. I am available to meet at your convenience to further discuss how my background and interests might contribute to your research.\n\nThank you for considering my inquiry. I have attached my resume for your review, and I look forward to the possibility of working with you.\n\nSincerely,\n[Your Name]\n[Your Contact Information]`
+      const data = await response.json()
 
-        setEmailDraft(mockEmail)
-        setGenerating(false)
-      }, 1500)
+      if (response.ok) {
+        setEmailDraft(data.email)
+      } else {
+        console.error("API error:", data.error)
+      }
+      setGenerating(false)
     } catch (error) {
       console.error("Error generating email:", error)
       setGenerating(false)
