@@ -195,9 +195,12 @@ export default function Profile() {
 
       <form onSubmit={handleSubmit}>
         <Card>
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
-            <CardDescription>Update your profile information to personalize your experience</CardDescription>
+          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+            <div>
+              <CardTitle>Personal Information</CardTitle>
+              <CardDescription>Update your profile information to personalize your experience</CardDescription>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => alert("Import from LinkedIn coming soon!")}>Import from LinkedIn</Button>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">

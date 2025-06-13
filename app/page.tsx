@@ -51,7 +51,7 @@ export default function Home() {
       </section>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
@@ -59,8 +59,8 @@ export default function Home() {
             </CardTitle>
             <CardDescription>Create professional emails to reach out to research labs</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
+          <CardContent className="flex flex-col grow">
+            <p className="mb-4 text-sm text-muted-foreground flex-grow">
               Select your target school and lab to generate a personalized email template for research opportunities.
             </p>
             <Button asChild className="w-full">
@@ -71,7 +71,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5" />
@@ -79,8 +79,8 @@ export default function Home() {
             </CardTitle>
             <CardDescription>Get personalized essay topic suggestions based on your profile</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
+          <CardContent className="flex flex-col grow">
+            <p className="mb-4 text-sm text-muted-foreground flex-grow">
               Input your essay prompt and get tailored brainstorming ideas based on your experiences and background.
             </p>
             <Button asChild className="w-full">
@@ -91,7 +91,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Book className="h-5 w-5" />
@@ -99,8 +99,8 @@ export default function Home() {
             </CardTitle>
             <CardDescription>Get AI-powered feedback on your college essays</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
+          <CardContent className="flex flex-col grow">
+            <p className="mb-4 text-sm text-muted-foreground flex-grow">
               Upload your essay and receive detailed feedback on structure, clarity, style, and emotional impact.
             </p>
             <Button asChild className="w-full">
@@ -111,7 +111,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="h-5 w-5" />
@@ -119,8 +119,8 @@ export default function Home() {
             </CardTitle>
             <CardDescription>Upload your practice tests and get personalized improvement strategies</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
+          <CardContent className="flex flex-col grow">
+            <p className="mb-4 text-sm text-muted-foreground flex-grow">
               Submit your answer key or full test to receive detailed analysis and targeted study recommendations.
             </p>
             <Button asChild className="w-full">
@@ -131,7 +131,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="h-full flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5" />
@@ -139,8 +139,8 @@ export default function Home() {
             </CardTitle>
             <CardDescription>Generate personalized internship emails and track applications</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
+          <CardContent className="flex flex-col grow">
+            <p className="mb-4 text-sm text-muted-foreground flex-grow">
               Create professional outreach emails and manage your internship application process efficiently.
             </p>
             <Button asChild className="w-full">
