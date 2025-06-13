@@ -1,16 +1,16 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, X } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Upload, X, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ProfileData {
   name: string
@@ -25,11 +25,6 @@ interface ProfileData {
 
 export default function Profile() {
   const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [profileData, setProfileData] = useState<ProfileData>({
     name: "",
     school: "",
@@ -40,117 +35,61 @@ export default function Profile() {
     certifications: [""],
     projects: "",
   })
+
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
+  // Check if user is logged in and load profile data
   useEffect(() => {
-    checkAuth()
-  }, [])
+    const userData = localStorage.getItem("gradmate-user")
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData)
+        setIsLoggedIn(parsedUser.isLoggedIn)
 
-  const checkAuth = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        setIsAuthenticated(true)
+        // Pre-fill name from user data if available
+        if (parsedUser.name) {
+          setProfileData((prev) => ({
+            ...prev,
+            name: parsedUser.name,
+          }))
+        }
+      } catch (error) {
+        console.error("Error parsing user data:", error)
       }
-    } catch (error) {
-      console.error("Error checking auth:", error)
+    } else {
+      // Redirect to sign in if not logged in
+      router.push("/sign-in")
     }
-  }
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (signInError) throw signInError
-      setIsAuthenticated(true)
-    } catch (error) {
-      console.error("Error:", error)
-      setError(error instanceof Error ? error.message : "An error occurred")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    try {
-      // Create user in auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-
-      if (authError) throw authError
-
-      // Profile is automatically created by the trigger, so we just need to update it
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({
-            full_name: "",
-            current_school: "",
-            graduation_year: "",
-            gpa: "",
-            major: "",
-            minor: "",
-            interests: ""
-          })
-          .eq("id", authData.user.id)
-
-        if (profileError) throw profileError
+    // Load existing profile data if available
+    const savedProfile = localStorage.getItem("gradmate-profile")
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile)
+        setProfileData((prev) => ({
+          ...prev,
+          ...parsed,
+          resume: null, // Can't store File objects in localStorage
+        }))
+      } catch (error) {
+        console.error("Error parsing profile data:", error)
       }
-
-      setIsAuthenticated(true)
-    } catch (error) {
-      console.error("Error:", error)
-      setError(error instanceof Error ? error.message : "An error occurred")
-    } finally {
-      setLoading(false)
     }
-  }
-
-  const handleContinueWithoutAccount = () => {
-    setIsAuthenticated(true)
-  }
-
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      setIsAuthenticated(false)
-      router.push("/")
-    } catch (error) {
-      console.error("Error signing out:", error)
-      setError(error instanceof Error ? error.message : "An error occurred")
-    }
-  }
+  }, [router])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setProfileData((prev) => ({ ...prev, [name]: value }))
-    setSaved(false)
   }
 
   const handleSelectChange = (name: string, value: string) => {
     setProfileData((prev) => ({ ...prev, [name]: value }))
-    setSaved(false)
   }
 
   const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setProfileData((prev) => ({ ...prev, resume: e.target.files![0] }))
-      setSaved(false)
     }
   }
 
@@ -158,7 +97,6 @@ export default function Profile() {
     const updatedCertifications = [...profileData.certifications]
     updatedCertifications[index] = value
     setProfileData((prev) => ({ ...prev, certifications: updatedCertifications }))
-    setSaved(false)
   }
 
   const addCertification = () => {
@@ -166,7 +104,6 @@ export default function Profile() {
       ...prev,
       certifications: [...prev.certifications, ""],
     }))
-    setSaved(false)
   }
 
   const removeCertification = (index: number) => {
@@ -176,115 +113,46 @@ export default function Profile() {
       ...prev,
       certifications: updatedCertifications,
     }))
-    setSaved(false)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
 
-    // Save to localStorage for use in other components
-    localStorage.setItem("gradmate-profile", JSON.stringify(profileData))
+    // Update user name in user data
+    const userData = localStorage.getItem("gradmate-user")
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData)
+        parsedUser.name = profileData.name
+        localStorage.setItem("gradmate-user", JSON.stringify(parsedUser))
+      } catch (error) {
+        console.error("Error updating user data:", error)
+      }
+    }
+
+    // Save profile data to localStorage
+    const profileToSave = {
+      ...profileData,
+      resume: null, // Can't store File objects in localStorage
+    }
+    localStorage.setItem("gradmate-profile", JSON.stringify(profileToSave))
 
     // Mock API call - in a real app, you would send the data to your backend
     setTimeout(() => {
       setSaving(false)
-      setSaved(true)
 
-      // Reset saved status after 3 seconds
-      setTimeout(() => {
-        setSaved(false)
-      }, 3000)
+      // Redirect to home page after saving
+      router.push("/")
     }, 1000)
   }
 
-  if (!isAuthenticated) {
+  if (!isLoggedIn) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-12">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Welcome to GradMate</CardTitle>
-            <CardDescription>
-              Sign in, create an account, or continue without one
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-              <TabsContent value="signin">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  {error && <p className="text-sm text-red-500">{error}</p>}
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Signing in..." : "Sign In"}
-                  </Button>
-                </form>
-              </TabsContent>
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  {error && <p className="text-sm text-red-500">{error}</p>}
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Creating account..." : "Create Account"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-            <div className="mt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full" 
-                onClick={handleContinueWithoutAccount}
-              >
-                Continue without account
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Alert>
+          <AlertDescription>Please sign in to access your profile.</AlertDescription>
+        </Alert>
       </div>
     )
   }
@@ -427,16 +295,16 @@ export default function Profile() {
               />
             </div>
 
-            <div className="flex gap-2">
-              <Button type="submit" className="flex-1">
-                Update Profile
-              </Button>
-            </div>
-            <div className="mt-4">
-              <Button type="button" variant="outline" className="w-full" onClick={handleSignOut}>
-                Sign Out
-              </Button>
-            </div>
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Profile"
+              )}
+            </Button>
           </CardContent>
         </Card>
       </form>
