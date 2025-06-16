@@ -7,23 +7,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+
+interface Professor {
+  id: string
+  name: string
+  email: string | null
+  title: string | null
+}
 
 interface Lab {
   id: string
   name: string
-  researchArea: string
-  description: string
+  research_area: string | null
+  description: string | null
+  lab_url: string | null
   professors: Professor[]
 }
 
-interface Professor {
+interface School {
+  id: string
   name: string
-  email: string
-  title: string
+  slug: string | null
+  college: string | null
 }
 
 export default function ResearchEmails() {
-  const [selectedSchool, setSelectedSchool] = useState("gt")
+  const [schools, setSchools] = useState<School[]>([])
+  const [selectedSchool, setSelectedSchool] = useState<string>("")
   const [labs, setLabs] = useState<Lab[]>([])
   const [selectedLab, setSelectedLab] = useState("")
   const [currentLab, setCurrentLab] = useState<Lab | null>(null)
@@ -31,47 +42,43 @@ export default function ResearchEmails() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
 
-  // Fetch labs when school changes
+  // Load schools on mount
   useEffect(() => {
+    const loadSchools = async () => {
+      try {
+        const { data, error } = await supabase.from("schools").select("id, name, slug, college")
+        if (error) throw error
+        setSchools(data as School[])
+
+        // Preselect first school if none chosen
+        if (!selectedSchool && data && data.length) setSelectedSchool(data[0].id)
+      } catch (err) {
+        console.error("Error loading schools:", err)
+      }
+    }
+    loadSchools()
+  }, [])
+
+  // Fetch labs (with professors) when school changes
+  useEffect(() => {
+    if (!selectedSchool) {
+      setLabs([])
+      return
+    }
+
+    // Supabase query: labs plus nested professors
     const fetchLabs = async () => {
       setLoading(true)
       try {
-        // In a real app, this would be an actual API call
-        // const response = await fetch(`/api/labs?school=${selectedSchool}`)
-        // const data = await response.json()
+        const { data, error } = await supabase
+          .from("labs")
+          .select("id, name, research_area, description, lab_url, professors(id, name, email, title)")
+          .eq("school_id", selectedSchool)
 
-        // Mock data for demonstration
-        const mockLabs: Lab[] = [
-          {
-            id: "lab1",
-            name: "Machine Learning Lab",
-            researchArea: "Artificial Intelligence",
-            description: "Focused on developing novel machine learning algorithms for real-world applications.",
-            professors: [
-              { name: "Dr. Jane Smith", email: "jsmith@gatech.edu", title: "Associate Professor" },
-              { name: "Dr. Robert Chen", email: "rchen@gatech.edu", title: "Assistant Professor" },
-            ],
-          },
-          {
-            id: "lab2",
-            name: "Biomedical Engineering Lab",
-            researchArea: "Medical Devices",
-            description: "Researching innovative medical devices and technologies for healthcare applications.",
-            professors: [{ name: "Dr. Michael Johnson", email: "mjohnson@gatech.edu", title: "Professor" }],
-          },
-          {
-            id: "lab3",
-            name: "Robotics and Autonomous Systems Lab",
-            researchArea: "Robotics",
-            description: "Developing next-generation robotics and autonomous systems for various industries.",
-            professors: [
-              { name: "Dr. Sarah Williams", email: "swilliams@gatech.edu", title: "Professor" },
-              { name: "Dr. David Lee", email: "dlee@gatech.edu", title: "Research Scientist" },
-            ],
-          },
-        ]
+        if (error) throw error
 
-        setLabs(mockLabs)
+        // Cast to strong type
+        setLabs((data as any) as Lab[])
       } catch (error) {
         console.error("Error fetching labs:", error)
       } finally {
@@ -94,35 +101,69 @@ export default function ResearchEmails() {
     }
   }, [selectedLab, labs])
 
+  const LAMBDA_URL = "https://53dhwuhsl8.execute-api.us-east-2.amazonaws.com/default/gradmate-ai-service"
+
   const generateEmail = async () => {
     if (!currentLab) return
 
     setGenerating(true)
+
     try {
-      // In a real app, this would be an actual API call
-      // const response = await fetch(`/api/email-draft?lab_id=${selectedLab}`)
-      // const data = await response.json()
+      const apiKey = process.env.NEXT_PUBLIC_AI_SERVICE_KEY
 
-      // Mock email generation
-      setTimeout(() => {
-        const professor = currentLab.professors[0]
-        const mockEmail = `Subject: Undergraduate Research Opportunity Inquiry - ${currentLab.name}\n\nDear ${professor.name},\n\nI hope this email finds you well. My name is [Your Name], and I am a [Your Year] student at [Your University] majoring in [Your Major].\n\nI am writing to express my interest in research opportunities at the ${currentLab.name}. I was particularly drawn to your work in ${currentLab.researchArea}, especially [mention specific research or publication that interests you].\n\n${currentLab.description} This aligns perfectly with my academic interests and career goals in [relevant field].\n\nDuring my studies, I have completed coursework in [relevant courses] and have developed skills in [relevant skills]. I have also [mention any relevant projects, experience, or achievements].\n\nI would greatly appreciate the opportunity to discuss potential research positions in your lab, whether for course credit, as a volunteer, or as a paid position. I am available to meet at your convenience to further discuss how my background and interests might contribute to your research.\n\nThank you for considering my inquiry. I have attached my resume for your review, and I look forward to the possibility of working with you.\n\nSincerely,\n[Your Name]\n[Your Contact Information]`
+      // Fetch logged-in user info
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-        setEmailDraft(mockEmail)
-        setGenerating(false)
-      }, 1500)
-    } catch (error) {
+      // Request payload
+      const body: Record<string, any> = {
+        lab_title: currentLab.name,
+        professors: currentLab.professors.map((p) => p.name),
+        school: schools.find((s) => s.id === selectedSchool)?.name || "",
+      }
+
+      if (user?.id) {
+        body.user_id = user.id
+
+        // Pull profile for enriched context
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("name, school, major")
+          .eq("id", user.id)
+          .single()
+
+        body.student_name = profile?.name || undefined
+        body.student_major = profile?.major || undefined
+        // school already set but override if profile has one
+        if (profile?.school) body.school = profile.school
+      }
+
+      console.log("Lambda payload", body)
+
+      const res = await fetch(LAMBDA_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey || "",
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(`Lambda error ${res.status}: ${errText}`)
+      }
+
+      const data = await res.json()
+      setEmailDraft(data.email)
+    } catch (error: any) {
       console.error("Error generating email:", error)
+      setEmailDraft(`Error: ${error.message || "Unknown"}`)
+    } finally {
       setGenerating(false)
     }
   }
-
-  const schools = [
-    { value: "gt", label: "Georgia Tech" },
-    { value: "mit", label: "MIT" },
-    { value: "stanford", label: "Stanford University" },
-    { value: "harvard", label: "Harvard University" },
-  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -139,14 +180,18 @@ export default function ResearchEmails() {
               <label htmlFor="school" className="text-sm font-medium">
                 Select School
               </label>
-              <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+              <Select
+                value={selectedSchool}
+                onValueChange={(val) => setSelectedSchool(val)}
+                disabled={schools.length === 0}
+              >
                 <SelectTrigger id="school">
                   <SelectValue placeholder="Select a school" />
                 </SelectTrigger>
                 <SelectContent>
-                  {schools.map((school) => (
-                    <SelectItem key={school.value} value={school.value}>
-                      {school.label}
+                  {schools.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -183,7 +228,7 @@ export default function ResearchEmails() {
             <div className="rounded-md bg-muted p-4">
               <h3 className="font-medium mb-2">Lab Information</h3>
               <p className="text-sm font-medium">
-                Research Area: <span className="font-normal">{currentLab.researchArea}</span>
+                Research Area: <span className="font-normal">{currentLab.research_area}</span>
               </p>
               <p className="text-sm font-medium mt-2">
                 Description: <span className="font-normal">{currentLab.description}</span>
@@ -228,7 +273,7 @@ export default function ResearchEmails() {
                   </TableHeader>
                   <TableBody>
                     {currentLab?.professors.map((professor) => (
-                      <TableRow key={professor.email}>
+                      <TableRow key={professor.id}>
                         <TableCell>{professor.name}</TableCell>
                         <TableCell>{professor.email}</TableCell>
                         <TableCell>{professor.title}</TableCell>
