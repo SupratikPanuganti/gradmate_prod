@@ -61,7 +61,15 @@ export default function SignUp() {
         password: formData.password,
         options: {
           data: {
-            full_name: formData.name,
+            name: formData.name,
+            school: "",
+            major: "",
+            minor: "",
+            gpa: "",
+            interests: "",
+            projects: "",
+            certifications: [],
+            resume_path: null,
           },
         },
       })

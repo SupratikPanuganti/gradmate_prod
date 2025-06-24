@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,9 +19,10 @@ interface ProfileData {
   major: string
   minor: string
   gpa: string
-  resume: File | null
+  resumePath: string | null
   certifications: string[]
   projects: string
+  interests: string
 }
 
 export default function Profile() {
@@ -32,15 +33,100 @@ export default function Profile() {
     major: "",
     minor: "",
     gpa: "",
-    resume: null,
+    resumePath: null,
     certifications: [""],
     projects: "",
+    interests: "",
   })
 
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+
+  // Signed URL preview for private résumé bucket
+  const [resumePreview, setResumePreview] = useState<string | null>(null)
+
+  const handleCertificationsChange = (value: string) => {
+    // Split the comma-separated string into an array
+    const certs = value.split(",").map((cert) => cert.trim())
+    setProfileData((prev) => ({ ...prev, certifications: certs }))
+  }
+
+  // Refresh signed URL whenever resumePath changes
+  useEffect(() => {
+    const getSigned = async () => {
+      if (profileData.resumePath) {
+        const { data } = await supabase.storage
+          .from("resumes")
+          .createSignedUrl(profileData.resumePath, 60 * 60)
+        setResumePreview(data?.signedUrl || null)
+      } else {
+        setResumePreview(null)
+      }
+    }
+    getSigned()
+  }, [profileData.resumePath])
+
+  // Handle upload + autofill
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return
+    const file = e.target.files[0]
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const filePath = `${user.id}/resume.pdf`
+
+    const { error } = await supabase.storage
+      .from("resumes")
+      .upload(filePath, file, { upsert: true, contentType: "application/pdf" })
+    if (error) {
+      console.error("Resume upload error", error)
+      return
+    }
+
+    setProfileData((prev) => ({ ...prev, resumePath: filePath }))
+
+    // Call parsing stub – you can swap with Doc-IO later
+    try {
+      const resp = await fetch("/api/parse-resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: filePath }),
+      })
+      if (resp.ok) {
+        const parsed = await resp.json()
+        console.log("Parsed resume data", parsed)
+        if (parsed.error) {
+          console.error("Resume parse error", parsed)
+          return
+        }
+        const normalised: Partial<ProfileData> = { ...parsed }
+        // Ensure certifications array shape
+        if (Array.isArray(parsed.certifications)) {
+          normalised.certifications = parsed.certifications.length ? parsed.certifications : [""]
+        }
+
+        // Convert projects array -> newline string if needed
+        if (Array.isArray(parsed.projects)) {
+          normalised.projects = parsed.projects.join("\n")
+        }
+
+        setProfileData((prev) => ({
+          ...prev,
+          ...normalised,
+        }))
+      } else {
+        const errText = await resp.text()
+        console.error("Resume parse request failed", resp.status, errText)
+      }
+    } catch (err) {
+      console.warn("Resume parse failed", err)
+    }
+  }
 
   // Check auth and fetch profile from Supabase
   useEffect(() => {
@@ -60,7 +146,7 @@ export default function Profile() {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("name, school, major, minor, gpa")
+          .select("name, school, major, minor, gpa, resume_path, projects, interests, certifications")
           .eq("id", user.id)
           .single()
 
@@ -74,6 +160,11 @@ export default function Profile() {
             major: data.major || "",
             minor: data.minor || "",
             gpa: data.gpa || "",
+            resumePath: data.resume_path || null,
+            projects: data.projects || "",
+            interests: data.interests || "",
+            // Ensure certifications is always an array, even if null/empty in DB
+            certifications: Array.isArray(data.certifications) ? data.certifications : [""],
           }))
 
           // Update localStorage user name for navbar display
@@ -107,34 +198,6 @@ export default function Profile() {
     setProfileData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setProfileData((prev) => ({ ...prev, resume: e.target.files![0] }))
-    }
-  }
-
-  const handleCertificationChange = (index: number, value: string) => {
-    const updatedCertifications = [...profileData.certifications]
-    updatedCertifications[index] = value
-    setProfileData((prev) => ({ ...prev, certifications: updatedCertifications }))
-  }
-
-  const addCertification = () => {
-    setProfileData((prev) => ({
-      ...prev,
-      certifications: [...prev.certifications, ""],
-    }))
-  }
-
-  const removeCertification = (index: number) => {
-    const updatedCertifications = [...profileData.certifications]
-    updatedCertifications.splice(index, 1)
-    setProfileData((prev) => ({
-      ...prev,
-      certifications: updatedCertifications,
-    }))
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!userId) return
@@ -148,6 +211,10 @@ export default function Profile() {
         major: profileData.major,
         minor: profileData.minor,
         gpa: profileData.gpa,
+        resume_path: profileData.resumePath,
+        projects: profileData.projects,
+        interests: profileData.interests,
+        certifications: profileData.certifications.filter((c) => c), // Filter out empty strings
         updated_at: new Date().toISOString(),
       })
 
@@ -195,13 +262,42 @@ export default function Profile() {
 
       <form onSubmit={handleSubmit}>
         <Card>
-          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
               <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Update your profile information to personalize your experience</CardDescription>
+              <CardDescription>Upload your résumé to auto-fill or edit fields manually</CardDescription>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => alert("Import from LinkedIn coming soon!")}>Import from LinkedIn</Button>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="resume-upload"
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleResumeUpload}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => document.getElementById("resume-upload")?.click()}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {profileData.resumePath ? "Replace résumé" : "Upload résumé & autofill"}
+              </Button>
+            </div>
           </CardHeader>
+
+          {profileData.resumePath && (
+            <Alert className="mx-6 mb-4 bg-muted/50">
+              Résumé uploaded –
+              {resumePreview && (
+                <a href={resumePreview} target="_blank" rel="noopener" className="underline ml-1">
+                  preview
+                </a>
+              )}
+            </Alert>
+          )}
+
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -227,118 +323,84 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            {/* Major & Minor */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="major">Major</Label>
                 <Input
                   id="major"
                   name="major"
-                  placeholder="Computer Science"
+                  placeholder="e.g., Computer Science"
                   value={profileData.major}
                   onChange={handleInputChange}
                 />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="minor">Minor (Optional)</Label>
+                <Label htmlFor="minor">Minor</Label>
                 <Input
                   id="minor"
                   name="minor"
-                  placeholder="Mathematics"
+                  placeholder="e.g., Mathematics"
                   value={profileData.minor}
                   onChange={handleInputChange}
                 />
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            {/* GPA & Interests */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="gpa">GPA</Label>
-                <Input id="gpa" name="gpa" placeholder="3.8" value={profileData.gpa} onChange={handleInputChange} />
+                <Input
+                  id="gpa"
+                  name="gpa"
+                  placeholder="e.g., 4.0"
+                  value={profileData.gpa}
+                  onChange={handleInputChange}
+                />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="resume">Resume</Label>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => document.getElementById("resume-upload")?.click()}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {profileData.resume ? "Change Resume" : "Upload Resume"}
-                  </Button>
-                  <input
-                    id="resume-upload"
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx"
-                    onChange={handleResumeChange}
-                  />
-                </div>
-                {profileData.resume && (
-                  <div className="mt-2 flex items-center justify-between rounded-md bg-muted p-2 text-sm">
-                    <span className="truncate">{profileData.resume.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setProfileData((prev) => ({ ...prev, resume: null }))}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+                <Label htmlFor="interests">Professional Interests</Label>
+                <Input
+                  id="interests"
+                  name="interests"
+                  placeholder="e.g., Machine Learning, AI Ethics"
+                  value={profileData.interests}
+                  onChange={handleInputChange}
+                />
               </div>
             </div>
 
+            {/* Certifications */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Certifications</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addCertification}>
-                  Add Certification
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {profileData.certifications.map((cert, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Input
-                      value={cert}
-                      onChange={(e) => handleCertificationChange(index, e.target.value)}
-                      placeholder="e.g., AWS Certified Developer"
-                    />
-                    {profileData.certifications.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeCertification(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <Label htmlFor="certifications">Certifications</Label>
+              <Input
+                id="certifications"
+                name="certifications"
+                placeholder="e.g., PCAP, OCI Foundations (comma-separated)"
+                value={
+                  Array.isArray(profileData.certifications) ? profileData.certifications.join(", ") : ""
+                }
+                onChange={(e) => handleCertificationsChange(e.target.value)}
+              />
             </div>
 
+            {/* Projects */}
             <div className="space-y-2">
-              <Label htmlFor="projects">Projects</Label>
+              <Label htmlFor="projects">Key Projects</Label>
               <Textarea
                 id="projects"
                 name="projects"
-                placeholder="Describe your projects, one per line"
-                className="min-h-[120px]"
+                placeholder="Describe 1-3 of your most relevant projects, each on a new line."
                 value={profileData.projects}
                 onChange={handleInputChange}
+                rows={4}
               />
             </div>
 
             <Button type="submit" className="w-full" disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Profile"
-              )}
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Profile
             </Button>
           </CardContent>
         </Card>
