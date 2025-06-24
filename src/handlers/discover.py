@@ -832,6 +832,7 @@ def _scrape_personnel_section(lab_url: str) -> tuple[list[str], dict[str, str], 
         names: list[str] = []
         emails: dict[str, str] = {}
         roles: dict[str, str] = {}
+        profile_links: dict[str, str] = {}
 
         for el in heading.next_elements:
             if getattr(el, "name", "") in {"h2", "h3", "h4"}:
@@ -855,13 +856,8 @@ def _scrape_personnel_section(lab_url: str) -> tuple[list[str], dict[str, str], 
 
                 if name_val and name_val not in names:
                     names.append(name_val)
-                if name_val and email_val:
-                    emails[name_val] = email_val
-                    # role detection from sibling text
-                    sibling_txt = el.parent.get_text(" ", strip=True)
-                    rem = sibling_txt.replace(name_val, "").replace(email_val, "").strip()
-                    if rem and len(rem) < 60:
-                        roles[name_val] = rem
+                if name_val and href and not href.startswith("mailto:") and href.startswith("/"):
+                    profile_links[name_val] = urljoin(lab_url, href)
 
             # also check plain text list items
             if el.name in {"li", "p", "div", "span"}:
@@ -882,6 +878,28 @@ def _scrape_personnel_section(lab_url: str) -> tuple[list[str], dict[str, str], 
                         rem = txt.replace(name_val, "").replace(email_val, "").strip(" ,;:-")
                         if rem and len(rem) < 60:
                             roles[name_val] = rem
+                    if name_val and not email_val:
+                        # try to capture link inside element
+                        link_tag = el.find('a', href=True)
+                        if link_tag and not link_tag['href'].startswith('mailto:'):
+                            profile_links[name_val] = urljoin(lab_url, link_tag['href'])
+
+        # ------------------------------------------------------------------
+        # Follow profile links to fetch missing e-mails
+        # ------------------------------------------------------------------
+        def _extract_email_from_page(u: str) -> str | None:
+            try:
+                html2 = fetch(u, timeout=10)
+                m_mail = re.search(r"[\w.-]+@[\w.-]+\.\w+", html2)
+                return m_mail.group(0) if m_mail else None
+            except Exception:
+                return None
+
+        for nm in names:
+            if nm not in emails and nm in profile_links:
+                em = _extract_email_from_page(profile_links[nm])
+                if em:
+                    emails[nm] = em
 
         return names, emails, roles
     except Exception as exc:

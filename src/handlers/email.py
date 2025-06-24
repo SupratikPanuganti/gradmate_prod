@@ -407,4 +407,8 @@ Now, generate the complete email for {professors[0]}.
     )
     email_text = completion.choices[0].message.content
 
+    import re
+    # Remove placeholder phone placeholders
+    email_text = re.sub(r"\[Phone Number\]|\(Your contact number\)", "", email_text, flags=re.I)
+
     return {"email": email_text, "lab_summary": lab_summary} 

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { supabase } from "@/lib/supabase"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // --------------------
 // Types
@@ -25,6 +26,7 @@ interface LabArea {
   description: string
   faculty: FacultyMember[]
   lab_url?: string
+  matchScore?: number // 0–1
 }
 
 export default function ResearchAgentPage() {
@@ -34,6 +36,7 @@ export default function ResearchAgentPage() {
 
   // Discovered labs
   const [labAreas, setLabAreas] = useState<LabArea[]>([])
+  const [activeTab, setActiveTab] = useState<"manual" | "ai">("manual")
   const [selectedLabId, setSelectedLabId] = useState<string>("")
   const [currentLab, setCurrentLab] = useState<LabArea | null>(null)
 
@@ -86,12 +89,36 @@ export default function ResearchAgentPage() {
       const json = await res.json()
       // Expecting { labs: [{ name, description }] }
       const researchUrl: string | undefined = json.research_url
+
+      // Simple keyword-overlap match score using user profile (if logged in)
+      let profileText = ""
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user?.id) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("major, interests, skills")
+            .eq("id", user.id)
+            .single()
+          profileText = JSON.stringify(profile || "").toLowerCase()
+        }
+      } catch (_) {}
+
+      const keywordScore = (desc: string): number => {
+        if (!profileText) return 0
+        const words = new Set(desc.toLowerCase().split(/[^a-z]+/).filter((w: string) => w.length > 3))
+        let hits = 0
+        words.forEach((w) => { if (profileText.includes(w)) hits++ })
+        return words.size ? hits / words.size : 0
+      }
+
       const labs: LabArea[] = (json.labs || []).map((l: any, idx: number) => ({
         id: `${idx}`,
         name: l.name,
         description: l.description,
         faculty: Array.isArray(l.faculty) ? l.faculty : [],
         lab_url: l.lab_url || researchUrl,
+        matchScore: keywordScore(l.description || ""),
       }))
       setLabAreas(labs)
     } catch (err: any) {
@@ -199,160 +226,181 @@ export default function ResearchAgentPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold">Research Email Agent</h1>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Step 1 – Tell us where you study</CardTitle>
-          <CardDescription>Enter your college and (optionally) your major</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label htmlFor="college" className="text-sm font-medium">
-                College / University
-              </label>
-              <Input id="college" value={college} onChange={(e) => setCollege(e.target.value)} placeholder="University of Georgia" />
-            </div>
+      <Tabs value={activeTab} onValueChange={(v)=>setActiveTab(v as any)} className="w-full">
+        <TabsList>
+          <TabsTrigger value="manual">Manual</TabsTrigger>
+          <TabsTrigger value="ai">AI Suggestions (beta)</TabsTrigger>
+        </TabsList>
 
-            <div className="space-y-2">
-              <label htmlFor="major" className="text-sm font-medium">
-                Major (optional)
-              </label>
-              <Input id="major" value={major} onChange={(e) => setMajor(e.target.value)} placeholder="Computer Science" />
-            </div>
-          </div>
-
-          <Button onClick={discoverLabs} disabled={!college.trim() || discovering} className="w-full">
-            {discovering ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Discovering Labs…
-              </>
-            ) : (
-              "Find Research Areas"
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {errorMsg && (
-        <div className="rounded-md bg-red-100 text-red-700 p-4 border border-red-300">
-          {errorMsg}
-        </div>
-      )}
-
-      {labAreas.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Step 2 – Select a Research Area</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <label htmlFor="lab" className="text-sm font-medium">
-                Research Area / Lab
-              </label>
-              <Select value={selectedLabId} onValueChange={onSelectLab}>
-                <SelectTrigger id="lab">
-                  <SelectValue placeholder="Select a research area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {labAreas.map((lab) => (
-                    <SelectItem key={lab.id} value={lab.id}>
-                      {lab.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {currentLab && (
-              <div className="rounded-md bg-muted p-4 space-y-4">
-                <div>
-                  <h3 className="font-medium mb-2">Description</h3>
-                  <p className="text-sm whitespace-pre-wrap">{currentLab.description}</p>
+        <TabsContent value="manual" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Step 1 – Tell us where you study</CardTitle>
+              <CardDescription>Enter your college and (optionally) your major</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label htmlFor="college" className="text-sm font-medium">
+                    College / University
+                  </label>
+                  <Input id="college" value={college} onChange={(e) => setCollege(e.target.value)} placeholder="University of Georgia" />
                 </div>
-                <a
-                  href={currentLab.lab_url || "#"}
-                  target={currentLab.lab_url ? "_blank" : undefined}
-                  rel="noopener noreferrer"
-                  className={`inline-flex items-center text-sm ${currentLab.lab_url ? "text-blue-600 hover:underline" : "text-gray-400 cursor-not-allowed"}`}
-                  style={{ pointerEvents: currentLab.lab_url ? "auto" : "none" }}
-                >
-                  Go to lab <ExternalLink className="ml-1 h-3.5 w-3.5" />
-                </a>
+
+                <div className="space-y-2">
+                  <label htmlFor="major" className="text-sm font-medium">
+                    Major (optional)
+                  </label>
+                  <Input id="major" value={major} onChange={(e) => setMajor(e.target.value)} placeholder="Computer Science" />
+                </div>
               </div>
-            )}
 
-            <Button onClick={generateEmail} disabled={!currentLab || generating} className="w-full">
-              {generating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Email…
-                </>
-              ) : (
-                "Generate Email"
-              )}
-            </Button>
+              <Button onClick={discoverLabs} disabled={!college.trim() || discovering} className="w-full">
+                {discovering ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Discovering Labs…
+                  </>
+                ) : (
+                  "Find Research Areas"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
 
-            {/* Email draft moved to Step 3 */}
-          </CardContent>
-        </Card>
-      )}
-
-      {emailDraft && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Step 3 – Review & Choose Faculty</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email-draft" className="text-sm font-medium">
-                Email Draft
-              </label>
-              <Textarea
-                id="email-draft"
-                value={emailDraft}
-                onChange={(e) => setEmailDraft(e.target.value)}
-                className="min-h-[300px] font-mono text-sm"
-              />
+          {errorMsg && (
+            <div className="rounded-md bg-red-100 text-red-700 p-4 border border-red-300">
+              {errorMsg}
             </div>
+          )}
 
-            {currentLab?.faculty?.length ? (
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium">Faculty</h4>
-                {currentLab.faculty.map((fac) => (
-                  <div key={fac.name} className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={profSelections[fac.name]?.checked}
-                      onChange={(e) =>
-                        setProfSelections({
-                          ...profSelections,
-                          [fac.name]: { ...(profSelections[fac.name] || { email: "" }), checked: e.target.checked },
-                        })
-                      }
-                    />
-                    <span className="text-sm w-40">{fac.name}{fac.role ? ` – ${fac.role}` : ""}</span>
-                    <Input
-                      placeholder="faculty email"
-                      value={profSelections[fac.name]?.email || fac.email || ""}
-                      onChange={(e) =>
-                        setProfSelections({
-                          ...profSelections,
-                          [fac.name]: { ...(profSelections[fac.name] || { checked: false }), email: e.target.value },
-                        })
-                      }
-                      className="flex-1"
-                    />
+          {activeTab === "manual" && labAreas.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Step 2 – Select a Research Area</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <label htmlFor="lab" className="text-sm font-medium">
+                    Research Area / Lab
+                  </label>
+                  <Select value={selectedLabId} onValueChange={onSelectLab}>
+                    <SelectTrigger id="lab">
+                      <SelectValue placeholder="Select a research area" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {labAreas.map((lab) => (
+                        <SelectItem key={lab.id} value={lab.id}>
+                          {lab.name} {typeof lab.matchScore === "number" && (
+                            <span className="text-xs text-muted-foreground">({Math.round(lab.matchScore*100)}%)</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {currentLab && (
+                  <div className="rounded-md bg-muted p-4 space-y-4">
+                    <div>
+                      <h3 className="font-medium mb-2">Description</h3>
+                      <p className="text-sm whitespace-pre-wrap">{currentLab.description}</p>
+                    </div>
+                    <a
+                      href={currentLab.lab_url || "#"}
+                      target={currentLab.lab_url ? "_blank" : undefined}
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center text-sm ${currentLab.lab_url ? "text-blue-600 hover:underline" : "text-gray-400 cursor-not-allowed"}`}
+                      style={{ pointerEvents: currentLab.lab_url ? "auto" : "none" }}
+                    >
+                      Go to lab <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                    </a>
                   </div>
-                ))}
-              </div>
-            ) : null}
+                )}
 
-            <div className="pt-4">
-              <Button onClick={draftToGmail} className="w-full">Save to Gmail Drafts</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <Button onClick={generateEmail} disabled={!currentLab || generating} className="w-full">
+                  {generating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Email…
+                    </>
+                  ) : (
+                    "Generate Email"
+                  )}
+                </Button>
+
+                {/* Email draft moved to Step 3 */}
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "manual" && emailDraft && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Step 3 – Review & Choose Faculty</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="email-draft" className="text-sm font-medium">
+                    Email Draft
+                  </label>
+                  <Textarea
+                    id="email-draft"
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    className="min-h-[300px] font-mono text-sm"
+                  />
+                </div>
+
+                {currentLab?.faculty?.length ? (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium">Faculty</h4>
+                    {currentLab.faculty.map((fac) => (
+                      <div key={fac.name} className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={profSelections[fac.name]?.checked}
+                          onChange={(e) =>
+                            setProfSelections({
+                              ...profSelections,
+                              [fac.name]: { ...(profSelections[fac.name] || { email: "" }), checked: e.target.checked },
+                            })
+                          }
+                        />
+                        <span className="text-sm w-40">{fac.name}{fac.role ? ` – ${fac.role}` : ""}</span>
+                        <Input
+                          placeholder="faculty email"
+                          value={profSelections[fac.name]?.email || fac.email || ""}
+                          onChange={(e) =>
+                            setProfSelections({
+                              ...profSelections,
+                              [fac.name]: { ...(profSelections[fac.name] || { checked: false }), email: e.target.value },
+                            })
+                          }
+                          className="flex-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="pt-4">
+                  <Button onClick={draftToGmail} className="w-full">Save to Gmail Drafts</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* AI Suggestions placeholder */}
+        <TabsContent value="ai">
+          <Card>
+            <CardHeader>
+              <CardTitle>AI Suggestions</CardTitle>
+              <CardDescription>Coming soon – we'll automatically suggest labs based on your profile.</CardDescription>
+            </CardHeader>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 } 
